@@ -68,20 +68,23 @@ The eleventh agent (compliance-mapper) is not a persona but a verifier that auto
 
 ## The twelve phases
 
+Canonical numbering per `plugins/pantheon/references/12-phases-spec.md`. Phases 0-11 sequential by default; phase 12 generates final deliverables.
+
 | Phase | Name | Primary personas | Output |
 |---|---|---|---|
-| 0 | Scope and rules of engagement | orchestrator | sow.md |
-| 1 | Codebase mapping and asset inventory | orchestrator, mudge-holistic | asset-inventory.md |
-| 2 | Threat model and attack-surface map | mudge-holistic, bishop-fox-red-team | threat-model.md |
-| 3 | OWASP ASVS L3 audit | trail-of-bits, ncc-group, cure53 | asvs-l3-checklist.md |
-| 4 | Cryptographic deep dive | trail-of-bits, ncc-group, galois | crypto-audit.md |
-| 5 | Formal verification candidates | galois-formal-verif | formal-verif-candidates.md |
-| 6 | Supply-chain and SLSA evidence | latacora, trail-of-bits | supply-chain-slsa.md |
-| 7 | Red team simulation narrative | bishop-fox-red-team, project-zero | red-team-narrative.md |
-| 8 | Codebase maturity rubric | mudge-holistic | codebase-maturity.md |
-| 9 | Compliance matrix stacked | compliance-mapper | compliance-matrix.md |
-| 10 | Adversarial gate log | adversarial-judge | gate-log.md |
-| 11 | Recommendations and 90-day roadmap | orchestrator | recommendations.md |
+| 0 | Kickoff | orchestrator | sow.md, threat-actor-profile.md |
+| 1 | Architecture Review | mudge-holistic, latacora-pragmatic | architecture-review.md |
+| 2 | Strategic Threat Model | mudge-holistic, project-zero-researcher | strategic-threat-model.md |
+| 3 | ASVS L3 Audit | trail-of-bits, ncc-group, cure53 (parallel) | asvs-findings.md |
+| 4 | Crypto Deep Dive | trail-of-bits, galois-formal | crypto-validation.md |
+| 5 | Formal Verif Candidates | galois-formal | formal-verif-roadmap.md |
+| 6 | SAST/DAST/SCA Coverage | trail-of-bits, ncc-group | automated-coverage.md |
+| 7 | Property-Based Fuzzing | trail-of-bits, galois-formal | fuzzing-strategy.md |
+| 8 | Supply Chain SLSA | latacora-pragmatic | supply-chain-report.md |
+| 9 | Red Team Simulation | bishop-fox, project-zero | red-team-report.md |
+| 10 | Compliance Mapping | compliance-mapper | compliance-matrix.md |
+| 11 | Adversarial Cross-Verification | adversarial-judge | cross-verification.md |
+| 12 | Final Deliverables | orchestrator + all personas | 35 deliverables in `~/Downloads/pantheon-audit-<uuid>/` |
 
 ## The thirty-five deliverables
 
@@ -180,7 +183,9 @@ Prerequisites:
 /reload-plugins
 ```
 
-First-run initialization creates the `.pantheon/` scaffold. See `docs/installation.md` for the troubleshooting walkthrough.
+Install only from `alehnzgarcia7-crypto/pantheon-audit`. Reject look-alike names: `pantheon-pro`, `pantheon-audit-pro`, `pantheon-audit-plus`, `panthe0n-audit`, regional variants like `pantheon-audit-mx`. Verify release bundles with `cosign verify-blob` per the `SECURITY.md` policy. Typosquatting awareness detail is in `docs/installation.md`.
+
+First-run initialization creates the `.pantheon/` scaffold (auto-appended to `.gitignore`). See `docs/installation.md` for the troubleshooting walkthrough, the cloud-sync warning, and the full typosquatting list.
 
 ## Usage patterns
 
