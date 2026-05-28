@@ -1,0 +1,122 @@
+name: CodeQL
+
+# CodeQL with GitHub Code Scanning requires GitHub Advanced Security
+# on private repos. On a private repo without Advanced Security the
+# upload-sarif step will fail with HTTP 403. This workflow therefore:
+#   1. Runs only on workflow_dispatch (no automatic triggers) by default.
+#   2. Includes a public-repo or GHAS-enabled guard.
+#   3. Uploads SARIF as artifact (always works) in addition to attempting
+#      the Code Scanning upload (which is what gives you the Security tab).
+# Once the repo is made public, or GHAS is enabled, this workflow becomes
+# active and integrates with the Code Scanning UI without further changes.
+
+on:
+  workflow_dispatch:
+    inputs:
+      force:
+        description: 'Force run even on private-without-GHAS (artifact-only output)'
+        type: boolean
+        default: false
+  schedule:
+    - cron: '23 5 * * 1'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: codeql-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
+
+jobs:
+  preflight:
+    name: Preflight (Advanced Security check)
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    permissions:
+      contents: read
+    outputs:
+      proceed: ${{ steps.gate.outputs.proceed }}
+      reason: ${{ steps.gate.outputs.reason }}
+    steps:
+      - name: Evaluate
+        id: gate
+        env:
+          IS_PRIVATE: ${{ github.event.repository.private }}
+          FORCE: ${{ inputs.force }}
+        run: |
+          set -euo pipefail
+          if [ "${IS_PRIVATE}" = "false" ]; then
+            echo "proceed=true" >> "${GITHUB_OUTPUT}"
+            echo "reason=public-repo" >> "${GITHUB_OUTPUT}"
+          elif [ "${FORCE}" = "true" ]; then
+            echo "proceed=true" >> "${GITHUB_OUTPUT}"
+            echo "reason=force-artifact-only" >> "${GITHUB_OUTPUT}"
+          else
+            echo "proceed=false" >> "${GITHUB_OUTPUT}"
+            echo "reason=private-no-GHAS" >> "${GITHUB_OUTPUT}"
+          fi
+      - name: Gate summary
+        run: |
+          {
+            echo "## CodeQL preflight"
+            echo ""
+            echo "- proceed: ${{ steps.gate.outputs.proceed }}"
+            echo "- reason: ${{ steps.gate.outputs.reason }}"
+            if [ "${{ steps.gate.outputs.proceed }}" = "false" ]; then
+              echo ""
+              echo "Code Scanning upload is unavailable on private repositories without GitHub Advanced Security."
+              echo "To run CodeQL anyway and capture results as an artifact, re-run via 'Run workflow' with 'force' enabled."
+              echo "Alternatively, enable Advanced Security in repo settings, or make the repository public."
+            fi
+          } >> "${GITHUB_STEP_SUMMARY}"
+
+  analyze:
+    name: Analyze (${{ matrix.language }})
+    needs: preflight
+    if: needs.preflight.outputs.proceed == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    permissions:
+      contents: read
+      security-events: write
+    strategy:
+      fail-fast: false
+      matrix:
+        language: ['python']
+    steps:
+      - name: Harden runner
+        uses: step-security/harden-runner@0080882f6c36860b6ba35c610c98ce87d4e2f26f # v2.10.2
+        with:
+          egress-policy: audit
+      - name: Checkout
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+      - name: Initialize CodeQL
+        uses: github/codeql-action/init@4f3212b61783c3c68e8309a0f18a699764811cda # v3.27.5
+        with:
+          languages: ${{ matrix.language }}
+          queries: security-and-quality
+          config: |
+            paths:
+              - plugins/pantheon/scripts
+              - plugins/pantheon/hooks/scripts
+            paths-ignore:
+              - .pantheon
+              - examples
+      - name: Perform CodeQL Analysis
+        id: analyze
+        uses: github/codeql-action/analyze@4f3212b61783c3c68e8309a0f18a699764811cda # v3.27.5
+        continue-on-error: true
+        with:
+          category: /language:${{ matrix.language }}
+          upload: ${{ needs.preflight.outputs.reason != 'force-artifact-only' }}
+          output: codeql-results
+      - name: Upload SARIF artifact (always)
+        if: always()
+        uses: actions/upload-artifact@b4b15b8c7c6ac21ea08fcf65892d2ee8f75cf882 # v4.4.3
+        with:
+          name: codeql-${{ matrix.language }}-sarif
+          path: codeql-results
+          if-no-files-found: warn
+          retention-days: 30
