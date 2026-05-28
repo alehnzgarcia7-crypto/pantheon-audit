@@ -1,0 +1,102 @@
+title = "PANTHEON gitleaks config"
+
+[allowlist]
+description = "Allow lifecycle paths and known non-secret patterns"
+paths = [
+    '''\.pantheon/.*''',
+    '''docs/example-finding\.md''',
+    '''examples/.*''',
+    '''\.pantheon-audit-PREVIEW.*''',
+    '''pantheon-audit-[0-9a-f-]{36}.*''',
+]
+regexes = [
+    '''PANTHEON-[0-9]{4}''',
+    '''CVE-[0-9]{4}-[0-9]{4,7}''',
+    '''GHSA-[a-z0-9]{4}-[a-z0-9]{4}-[a-z0-9]{4}''',
+    '''CWE-[0-9]+''',
+    '''[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}''',
+]
+
+[[rules]]
+id = "generic-api-key"
+description = "Generic API key"
+regex = '''(?i)(api_key|apikey|secret|token)[\s]*[:=][\s]*['"]?[a-zA-Z0-9_\-]{20,}['"]?'''
+tags = ["secret", "generic"]
+
+[[rules]]
+id = "github-pat"
+description = "GitHub personal access token"
+regex = '''ghp_[a-zA-Z0-9]{36}'''
+tags = ["github", "secret"]
+
+[[rules]]
+id = "github-fine-grained-pat"
+description = "GitHub fine-grained PAT"
+regex = '''github_pat_[a-zA-Z0-9_]{82}'''
+tags = ["github", "secret"]
+
+[[rules]]
+id = "github-oauth"
+description = "GitHub OAuth token"
+regex = '''gho_[a-zA-Z0-9]{36}'''
+tags = ["github", "secret"]
+
+[[rules]]
+id = "github-app-token"
+description = "GitHub app installation token"
+regex = '''(ghu|ghs)_[a-zA-Z0-9]{36}'''
+tags = ["github", "secret"]
+
+[[rules]]
+id = "private-key-block"
+description = "PEM private key header"
+regex = '''-----BEGIN (RSA|DSA|EC|OPENSSH|PGP) PRIVATE KEY-----'''
+tags = ["key", "secret"]
+
+[[rules]]
+id = "aws-access-key"
+description = "AWS Access Key"
+regex = '''(A3T[A-Z0-9]|AKIA|AGPA|AIDA|AROA|AIPA|ANPA|ANVA|ASIA)[A-Z0-9]{16}'''
+tags = ["aws", "secret"]
+
+[[rules]]
+id = "aws-secret-key"
+description = "AWS Secret Access Key (heuristic)"
+regex = '''(?i)aws(.{0,20})?(secret|access)?_?key[^a-z0-9]{1,4}[A-Za-z0-9/+=]{40}'''
+tags = ["aws", "secret"]
+
+[[rules]]
+id = "anthropic-api-key"
+description = "Anthropic API key"
+regex = '''sk-ant-[a-zA-Z0-9_\-]{40,}'''
+tags = ["anthropic", "secret"]
+
+[[rules]]
+id = "openai-api-key"
+description = "OpenAI API key"
+regex = '''sk-(proj-)?[A-Za-z0-9_\-]{20,}'''
+tags = ["openai", "secret"]
+
+[[rules]]
+id = "slack-token"
+description = "Slack token"
+regex = '''xox[abprs]-[A-Za-z0-9-]{10,}'''
+tags = ["slack", "secret"]
+
+[[rules]]
+id = "stripe-api-key"
+description = "Stripe API key"
+regex = '''(sk|rk)_(live|test)_[A-Za-z0-9]{20,}'''
+tags = ["stripe", "secret"]
+
+[[rules]]
+id = "cosign-private-key"
+description = "Cosign Sigstore private key material"
+regex = '''(LS0tLS1CRUdJTiBDT1NJR04gUFJJVkFURSBLRVktLS0tLQ==|cosign\.key)'''
+tags = ["cosign", "key"]
+
+[[rules]]
+id = "jwt"
+description = "JSON Web Token (heuristic)"
+regex = '''eyJ[A-Za-z0-9_=-]{8,}\.eyJ[A-Za-z0-9_=-]{8,}\.[A-Za-z0-9_=-]{8,}'''
+tags = ["jwt", "secret"]

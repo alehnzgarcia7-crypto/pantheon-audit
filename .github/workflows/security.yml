@@ -1,0 +1,712 @@
+name: Security CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  schedule:
+    - cron: '17 4 * * 1'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: security-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
+
+env:
+  ARTIFACT_RETENTION_DAYS: 30
+
+jobs:
+  gitleaks:
+    name: Secrets (gitleaks)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    steps:
+      - name: Harden runner
+        uses: step-security/harden-runner@9af89fc71515a100421586dfdb3dc9c984fbf411 # v2.19.4
+        with:
+          egress-policy: audit
+      - name: Checkout
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Install gitleaks
+        run: |
+          set -euo pipefail
+          V=8.21.2
+          curl -sSfL "https://github.com/gitleaks/gitleaks/releases/download/v${V}/gitleaks_${V}_linux_x64.tar.gz" -o gitleaks.tar.gz
+          tar -xzf gitleaks.tar.gz gitleaks
+          sudo install -m 0755 gitleaks /usr/local/bin/gitleaks
+          gitleaks version
+      - name: Scan repository
+        id: scan
+        run: |
+          set +e
+          gitleaks detect --config .gitleaks.toml --source . --no-banner \
+            --report-format sarif --report-path gitleaks.sarif \
+            --redact --exit-code 0
+          gitleaks detect --config .gitleaks.toml --source . --no-banner \
+            --report-format json --report-path gitleaks.json \
+            --redact --exit-code 0
+          n=$(jq 'length' gitleaks.json 2>/dev/null || echo 0)
+          echo "count=${n}" >> "${GITHUB_OUTPUT}"
+      - name: Upload SARIF
+        if: always()
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
+        with:
+          name: gitleaks-sarif
+          path: gitleaks.sarif
+          retention-days: ${{ env.ARTIFACT_RETENTION_DAYS }}
+      - name: Upload JSON
+        if: always()
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
+        with:
+          name: gitleaks-json
+          path: gitleaks.json
+          retention-days: ${{ env.ARTIFACT_RETENTION_DAYS }}
+      - name: Step summary
+        if: always()
+        run: |
+          set -euo pipefail
+          n="${{ steps.scan.outputs.count }}"
+          {
+            echo "## Secrets scan (gitleaks)"
+            echo ""
+            echo "Findings: **${n}**"
+            if [ "${n}" != "0" ]; then
+              echo ""
+              echo "| File | Rule | Line | Match (redacted) |"
+              echo "|---|---|---|---|"
+              jq -r '.[] | "| \(.File) | \(.RuleID) | \(.StartLine) | \(.Match | gsub("[\\r\\n|]"; " ") | .[0:60]) |"' gitleaks.json
+            else
+              echo ""
+              echo "Clean."
+            fi
+          } >> "${GITHUB_STEP_SUMMARY}"
+      - name: Save summary for PR comment
+        if: always()
+        run: |
+          {
+            echo "### Secrets (gitleaks)"
+            echo "- Findings: **${{ steps.scan.outputs.count }}**"
+          } > gitleaks-summary.md
+      - name: Upload PR summary fragment
+        if: always()
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
+        with:
+          name: pr-summary-gitleaks
+          path: gitleaks-summary.md
+          retention-days: 1
+      - name: Threshold gate
+        run: |
+          n="${{ steps.scan.outputs.count }}"
+          if [ "${n:-0}" -gt 0 ]; then
+            echo "::error::gitleaks found ${n} secret(s)."
+            exit 1
+          fi
+
+  semgrep:
+    name: SAST (semgrep)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+    steps:
+      - name: Harden runner
+        uses: step-security/harden-runner@9af89fc71515a100421586dfdb3dc9c984fbf411 # v2.19.4
+        with:
+          egress-policy: audit
+      - name: Checkout
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          persist-credentials: false
+      - name: Set up Python
+        uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405 # v6.2.0
+        with:
+          python-version: '3.12'
+      - name: Cache pip
+        uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5.0.5
+        with:
+          path: ~/.cache/pip
+          key: pip-semgrep-${{ runner.os }}-1.95.0
+      - name: Cache semgrep rule cache
+        uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5.0.5
+        with:
+          path: ~/.semgrep
+          key: semgrep-rules-${{ runner.os }}-${{ hashFiles('.semgrep/**') }}
+          restore-keys: |
+            semgrep-rules-${{ runner.os }}-
+      - name: Install semgrep
+        run: python -m pip install --upgrade pip semgrep==1.152.0
+      - name: Run semgrep
+        id: scan
+        run: |
+          set +e
+          semgrep scan \
+            --config=.semgrep/pantheon-custom-rules.yml \
+            --config=p/ci \
+            --config=p/security-audit \
+            --config=p/secrets \
+            --sarif-output=semgrep.sarif \
+            --json-output=semgrep.json \
+            --metrics=off \
+            --disable-version-check \
+            --no-suppress-errors
+          rc=$?
+          err=$(jq '[.results[]? | select(.extra.severity=="ERROR")] | length' semgrep.json 2>/dev/null || echo 0)
+          warn=$(jq '[.results[]? | select(.extra.severity=="WARNING")] | length' semgrep.json 2>/dev/null || echo 0)
+          info=$(jq '[.results[]? | select(.extra.severity=="INFO")] | length' semgrep.json 2>/dev/null || echo 0)
+          err=$(printf '%s' "${err}" | head -n1)
+          warn=$(printf '%s' "${warn}" | head -n1)
+          info=$(printf '%s' "${info}" | head -n1)
+          {
+            echo "errors=${err:-0}"
+            echo "warnings=${warn:-0}"
+            echo "infos=${info:-0}"
+            echo "semgrep_rc=${rc}"
+          } >> "${GITHUB_OUTPUT}"
+      - name: Upload SARIF
+        if: always()
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
+        with:
+          name: semgrep-sarif
+          path: semgrep.sarif
+          retention-days: ${{ env.ARTIFACT_RETENTION_DAYS }}
+      - name: Upload JSON
+        if: always()
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
+        with:
+          name: semgrep-json
+          path: semgrep.json
+          retention-days: ${{ env.ARTIFACT_RETENTION_DAYS }}
+      - name: Step summary
+        if: always()
+        run: |
+          set -euo pipefail
+          err="${{ steps.scan.outputs.errors }}"
+          warn="${{ steps.scan.outputs.warnings }}"
+          info="${{ steps.scan.outputs.infos }}"
+          {
+            echo "## SAST (semgrep)"
+            echo ""
+            echo "| Severity | Count |"
+            echo "|---|---|"
+            echo "| ERROR | ${err} |"
+            echo "| WARNING | ${warn} |"
+            echo "| INFO | ${info} |"
+            echo ""
+            if [ "${err}${warn}" != "00" ]; then
+              echo "### Top findings"
+              echo "| Severity | Rule | File | Line | Message |"
+              echo "|---|---|---|---|---|"
+              jq -r '.results[]? | select(.extra.severity != "INFO") | "| \(.extra.severity) | \(.check_id | split(".") | last) | \(.path) | \(.start.line) | \(.extra.message | gsub("[\\r\\n|]"; " ") | .[0:100]) |"' semgrep.json | head -40
+            else
+              echo "Clean (no errors or warnings)."
+            fi
+          } >> "${GITHUB_STEP_SUMMARY}"
+      - name: Save summary for PR comment
+        if: always()
+        run: |
+          {
+            echo "### SAST (semgrep)"
+            echo "- Errors: **${{ steps.scan.outputs.errors }}**"
+            echo "- Warnings: ${{ steps.scan.outputs.warnings }}"
+            echo "- Infos: ${{ steps.scan.outputs.infos }}"
+          } > semgrep-summary.md
+      - name: Upload PR summary fragment
+        if: always()
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
+        with:
+          name: pr-summary-semgrep
+          path: semgrep-summary.md
+          retention-days: 1
+      - name: Threshold gate
+        run: |
+          err="${{ steps.scan.outputs.errors }}"
+          if [ "${err:-0}" -gt 0 ]; then
+            echo "::error::semgrep found ${err} ERROR-severity issue(s)."
+            exit 1
+          fi
+
+  bandit:
+    name: SAST (bandit, Python)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    steps:
+      - name: Harden runner
+        uses: step-security/harden-runner@9af89fc71515a100421586dfdb3dc9c984fbf411 # v2.19.4
+        with:
+          egress-policy: audit
+      - name: Checkout
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          persist-credentials: false
+      - name: Set up Python
+        uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405 # v6.2.0
+        with:
+          python-version: '3.12'
+      - name: Cache pip
+        uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5.0.5
+        with:
+          path: ~/.cache/pip
+          key: pip-bandit-${{ runner.os }}-1.8.0
+      - name: Install bandit with SARIF extra
+        run: python -m pip install --upgrade pip 'bandit[sarif,toml]==1.8.0'
+      - name: Run bandit (-ll -r with bandit.yaml)
+        id: scan
+        run: |
+          set +e
+          bandit -ll -r plugins/pantheon/scripts/ \
+            -c bandit.yaml \
+            -f json -o bandit.json
+          bandit -ll -r plugins/pantheon/scripts/ \
+            -c bandit.yaml \
+            -f sarif -o bandit.sarif
+          high=$(jq '[.results[]? | select(.issue_severity=="HIGH")] | length' bandit.json 2>/dev/null || echo 0)
+          med=$(jq '[.results[]? | select(.issue_severity=="MEDIUM")] | length' bandit.json 2>/dev/null || echo 0)
+          low=$(jq '[.results[]? | select(.issue_severity=="LOW")] | length' bandit.json 2>/dev/null || echo 0)
+          high=$(printf '%s' "${high}" | head -n1)
+          med=$(printf '%s' "${med}" | head -n1)
+          low=$(printf '%s' "${low}" | head -n1)
+          {
+            echo "high=${high:-0}"
+            echo "med=${med:-0}"
+            echo "low=${low:-0}"
+          } >> "${GITHUB_OUTPUT}"
+      - name: Upload SARIF
+        if: always()
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
+        with:
+          name: bandit-sarif
+          path: bandit.sarif
+          retention-days: ${{ env.ARTIFACT_RETENTION_DAYS }}
+      - name: Upload JSON
+        if: always()
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
+        with:
+          name: bandit-json
+          path: bandit.json
+          retention-days: ${{ env.ARTIFACT_RETENTION_DAYS }}
+      - name: Step summary
+        if: always()
+        run: |
+          set -euo pipefail
+          high="${{ steps.scan.outputs.high }}"
+          med="${{ steps.scan.outputs.med }}"
+          low="${{ steps.scan.outputs.low }}"
+          {
+            echo "## SAST (bandit)"
+            echo ""
+            echo "| Severity | Count |"
+            echo "|---|---|"
+            echo "| HIGH | ${high} |"
+            echo "| MEDIUM | ${med} |"
+            echo "| LOW | ${low} |"
+            echo ""
+            if [ "${high}${med}" != "00" ]; then
+              echo "### Findings (HIGH + MEDIUM)"
+              echo "| Severity | Test | File | Line | Message |"
+              echo "|---|---|---|---|---|"
+              jq -r '.results[]? | select(.issue_severity != "LOW") | "| \(.issue_severity) | \(.test_id) | \(.filename) | \(.line_number) | \(.issue_text | gsub("[\\r\\n|]"; " ") | .[0:80]) |"' bandit.json | head -30
+            else
+              echo "Clean (no HIGH or MEDIUM)."
+            fi
+          } >> "${GITHUB_STEP_SUMMARY}"
+      - name: Save summary for PR comment
+        if: always()
+        run: |
+          {
+            echo "### SAST (bandit)"
+            echo "- HIGH: **${{ steps.scan.outputs.high }}**"
+            echo "- MEDIUM: ${{ steps.scan.outputs.med }}"
+            echo "- LOW: ${{ steps.scan.outputs.low }}"
+          } > bandit-summary.md
+      - name: Upload PR summary fragment
+        if: always()
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
+        with:
+          name: pr-summary-bandit
+          path: bandit-summary.md
+          retention-days: 1
+      - name: Threshold gate
+        run: |
+          high="${{ steps.scan.outputs.high }}"
+          med="${{ steps.scan.outputs.med }}"
+          if [ "${high:-0}" -gt 0 ] || [ "${med:-0}" -gt 0 ]; then
+            echo "::error::bandit found HIGH or MEDIUM severity issue(s)."
+            exit 1
+          fi
+
+  shellcheck:
+    name: SAST (shellcheck, bash)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    steps:
+      - name: Harden runner
+        uses: step-security/harden-runner@9af89fc71515a100421586dfdb3dc9c984fbf411 # v2.19.4
+        with:
+          egress-policy: audit
+      - name: Checkout
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          persist-credentials: false
+      - name: Install shellcheck
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y shellcheck
+          shellcheck --version
+      - name: Find shell scripts
+        id: discover
+        run: |
+          set -euo pipefail
+          mapfile -t files < <(find . -type f \( -name '*.sh' -o -name '*.bash' \) -not -path './node_modules/*' -not -path './.git/*' -not -path './.pantheon/*' | sort)
+          printf '%s\n' "${files[@]}" > scripts.txt
+          count=${#files[@]}
+          echo "count=${count}" >> "${GITHUB_OUTPUT}"
+      - name: Run shellcheck
+        id: scan
+        run: |
+          set +e
+          if [ -s scripts.txt ]; then
+            xargs -a scripts.txt shellcheck -x -S warning -e SC1091 -f json1 > shellcheck.json
+          else
+            echo '{"comments":[]}' > shellcheck.json
+          fi
+          xargs -a scripts.txt shellcheck -x -S warning -e SC1091 -f gcc > shellcheck.txt || true
+          err=$(jq '[.comments[]? | select(.level=="error")] | length' shellcheck.json 2>/dev/null || echo 0)
+          warn=$(jq '[.comments[]? | select(.level=="warning")] | length' shellcheck.json 2>/dev/null || echo 0)
+          {
+            echo "errors=${err}"
+            echo "warnings=${warn}"
+          } >> "${GITHUB_OUTPUT}"
+      - name: Upload JSON
+        if: always()
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
+        with:
+          name: shellcheck-json
+          path: shellcheck.json
+          retention-days: ${{ env.ARTIFACT_RETENTION_DAYS }}
+      - name: Upload text report
+        if: always()
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
+        with:
+          name: shellcheck-text
+          path: shellcheck.txt
+          retention-days: ${{ env.ARTIFACT_RETENTION_DAYS }}
+      - name: Step summary
+        if: always()
+        run: |
+          set -euo pipefail
+          err="${{ steps.scan.outputs.errors }}"
+          warn="${{ steps.scan.outputs.warnings }}"
+          total_files="${{ steps.discover.outputs.count }}"
+          {
+            echo "## SAST (shellcheck)"
+            echo ""
+            echo "Scripts scanned: ${total_files}"
+            echo ""
+            echo "| Severity | Count |"
+            echo "|---|---|"
+            echo "| error | ${err} |"
+            echo "| warning | ${warn} |"
+            echo ""
+            if [ "${err}${warn}" != "00" ]; then
+              echo "### Findings"
+              echo "| Level | Code | File | Line | Message |"
+              echo "|---|---|---|---|---|"
+              jq -r '.comments[]? | "| \(.level) | SC\(.code) | \(.file) | \(.line) | \(.message | gsub("[\\r\\n|]"; " ") | .[0:80]) |"' shellcheck.json | head -40
+            else
+              echo "Clean."
+            fi
+          } >> "${GITHUB_STEP_SUMMARY}"
+      - name: Save summary for PR comment
+        if: always()
+        run: |
+          {
+            echo "### SAST (shellcheck)"
+            echo "- Errors: **${{ steps.scan.outputs.errors }}**"
+            echo "- Warnings: ${{ steps.scan.outputs.warnings }}"
+          } > shellcheck-summary.md
+      - name: Upload PR summary fragment
+        if: always()
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
+        with:
+          name: pr-summary-shellcheck
+          path: shellcheck-summary.md
+          retention-days: 1
+      - name: Threshold gate
+        run: |
+          err="${{ steps.scan.outputs.errors }}"
+          warn="${{ steps.scan.outputs.warnings }}"
+          if [ "${err:-0}" -gt 0 ] || [ "${warn:-0}" -gt 0 ]; then
+            echo "::error::shellcheck found ${err} error(s) and ${warn} warning(s)."
+            exit 1
+          fi
+
+  markdownlint:
+    name: Markdown lint
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    steps:
+      - name: Harden runner
+        uses: step-security/harden-runner@9af89fc71515a100421586dfdb3dc9c984fbf411 # v2.19.4
+        with:
+          egress-policy: audit
+      - name: Checkout
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          persist-credentials: false
+      - name: Install markdownlint-cli2
+        run: |
+          set -euo pipefail
+          curl -fsSL https://deb.nodesource.com/setup_20.x | sudo -E bash -
+          sudo apt-get install -y nodejs
+          sudo npm install -g markdownlint-cli2@0.14.0
+      - name: Run markdownlint
+        id: scan
+        run: |
+          set +e
+          markdownlint-cli2 --config markdownlint.json '**/*.md' '#node_modules' '#.pantheon' '#.git' > markdownlint.txt 2>&1
+          rc=$?
+          n=0
+          if [ -f markdownlint.txt ]; then
+            n=$(grep -cE '^[^[:space:]].*:[0-9]+(:[0-9]+)?' markdownlint.txt 2>/dev/null)
+            true  # absorb non-zero exit from grep when count is 0
+          fi
+          n=$(printf '%s' "${n:-0}" | head -n1)
+          n="${n:-0}"
+          {
+            echo "count=${n}"
+            echo "rc=${rc}"
+          } >> "${GITHUB_OUTPUT}"
+      - name: Upload report
+        if: always()
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
+        with:
+          name: markdownlint-report
+          path: markdownlint.txt
+          retention-days: ${{ env.ARTIFACT_RETENTION_DAYS }}
+      - name: Step summary
+        if: always()
+        run: |
+          set -euo pipefail
+          n="${{ steps.scan.outputs.count }}"
+          {
+            echo "## Markdown lint"
+            echo ""
+            echo "Findings: **${n}**"
+            if [ "${n}" != "0" ]; then
+              echo ""
+              echo '```'
+              head -100 markdownlint.txt
+              echo '```'
+            else
+              echo ""
+              echo "Clean."
+            fi
+          } >> "${GITHUB_STEP_SUMMARY}"
+      - name: Save summary for PR comment
+        if: always()
+        run: |
+          {
+            echo "### Markdown lint"
+            echo "- Findings: **${{ steps.scan.outputs.count }}**"
+          } > markdownlint-summary.md
+      - name: Upload PR summary fragment
+        if: always()
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
+        with:
+          name: pr-summary-markdownlint
+          path: markdownlint-summary.md
+          retention-days: 1
+      - name: Threshold gate
+        run: |
+          n="${{ steps.scan.outputs.count }}"
+          if [ "${n:-0}" -gt 0 ]; then
+            echo "::error::markdownlint found ${n} issue(s)."
+            exit 1
+          fi
+
+  pantheon-style:
+    name: PANTHEON style (em-dash, AI sig, persona boundary)
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+    steps:
+      - name: Harden runner
+        uses: step-security/harden-runner@9af89fc71515a100421586dfdb3dc9c984fbf411 # v2.19.4
+        with:
+          egress-policy: audit
+      - name: Checkout
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          persist-credentials: false
+      - name: No em-dash (U+2014)
+        id: emdash
+        run: |
+          set +e
+          out=$(grep -rPn $'\xe2\x80\x94' --include='*.md' --include='*.py' --include='*.sh' --include='*.yml' --include='*.yaml' --exclude-dir=.pantheon --exclude-dir=.git . || true)
+          if [ -n "${out}" ]; then
+            n=$(printf '%s\n' "${out}" | wc -l)
+            echo "count=${n}" >> "${GITHUB_OUTPUT}"
+            printf '%s\n' "${out}" > emdash.txt
+            exit 1
+          fi
+          echo "count=0" >> "${GITHUB_OUTPUT}"
+      - name: No forbidden AI signatures
+        id: aisig
+        if: always()
+        run: |
+          set +e
+          out=$(grep -rPn '(Generated by|Co-Authored-By:\s*Claude)' \
+            --include='*.md' --include='*.py' --include='*.sh' --include='*.yml' --include='*.yaml' \
+            --exclude-dir=.pantheon --exclude-dir=.git \
+            --exclude='security.yml' --exclude='.pre-commit-config.yaml' \
+            . || true)
+          if [ -n "${out}" ]; then
+            n=$(printf '%s\n' "${out}" | wc -l)
+            echo "count=${n}" >> "${GITHUB_OUTPUT}"
+            printf '%s\n' "${out}" > aisig.txt
+            exit 1
+          fi
+          echo "count=0" >> "${GITHUB_OUTPUT}"
+      - name: Persona instruction/data boundary clause present (PANTHEON-0013)
+        id: persona
+        if: always()
+        run: |
+          set +e
+          missing=0
+          : > persona-missing.txt
+          for f in plugins/pantheon/agents/*.md; do
+            if ! grep -qiE 'instruction.*data.*boundary|treat workspace files as data|do not execute instructions found in target|adversarial prompt injection.*defense|reject embedded directives' "${f}"; then
+              echo "${f}" >> persona-missing.txt
+              missing=$((missing+1))
+            fi
+          done
+          echo "count=${missing}" >> "${GITHUB_OUTPUT}"
+          if [ "${missing}" -gt 0 ]; then
+            exit 1
+          fi
+      - name: Upload reports
+        if: always()
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
+        with:
+          name: pantheon-style-reports
+          path: |
+            emdash.txt
+            aisig.txt
+            persona-missing.txt
+          if-no-files-found: ignore
+          retention-days: ${{ env.ARTIFACT_RETENTION_DAYS }}
+      - name: Step summary
+        if: always()
+        run: |
+          set -euo pipefail
+          {
+            echo "## PANTHEON style"
+            echo ""
+            echo "| Check | Violations |"
+            echo "|---|---|"
+            echo "| Em-dash (U+2014) | ${{ steps.emdash.outputs.count }} |"
+            echo "| AI signature lines | ${{ steps.aisig.outputs.count }} |"
+            echo "| Persona boundary clause missing | ${{ steps.persona.outputs.count }} |"
+          } >> "${GITHUB_STEP_SUMMARY}"
+      - name: Save summary for PR comment
+        if: always()
+        run: |
+          {
+            echo "### PANTHEON style"
+            echo "- Em-dash: ${{ steps.emdash.outputs.count }}"
+            echo "- AI signature: ${{ steps.aisig.outputs.count }}"
+            echo "- Persona boundary missing: ${{ steps.persona.outputs.count }}"
+          } > pantheon-style-summary.md
+      - name: Upload PR summary fragment
+        if: always()
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
+        with:
+          name: pr-summary-pantheon-style
+          path: pantheon-style-summary.md
+          retention-days: 1
+
+  pr-comment:
+    name: PR summary comment
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    needs: [gitleaks, semgrep, bandit, shellcheck, markdownlint, pantheon-style]
+    if: github.event_name == 'pull_request' && always()
+    permissions:
+      contents: read
+      pull-requests: write
+    steps:
+      - name: Harden runner
+        uses: step-security/harden-runner@9af89fc71515a100421586dfdb3dc9c984fbf411 # v2.19.4
+        with:
+          egress-policy: audit
+      - name: Download summary fragments
+        uses: actions/download-artifact@018cc2cf5baa6db3ef3c5f8a56943fffe632ef53 # v6.0.0
+        with:
+          pattern: pr-summary-*
+          path: fragments
+          merge-multiple: false
+      - name: Compose comment body
+        id: compose
+        run: |
+          set -euo pipefail
+          {
+            echo "## Security CI summary"
+            echo ""
+            echo "Run: [${GITHUB_RUN_ID}](${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID})"
+            echo "Commit: \`${GITHUB_SHA:0:7}\`"
+            echo ""
+            for d in fragments/pr-summary-*; do
+              if [ -d "${d}" ]; then
+                cat "${d}"/*.md 2>/dev/null || true
+                echo ""
+              fi
+            done
+            echo ""
+            echo "Full SARIF/JSON artifacts attached to the workflow run."
+            echo ""
+            echo "<sub>Updated by Security CI. Threshold gates per-job in workflow logs.</sub>"
+          } > comment.md
+          {
+            echo 'body<<COMMENT_EOF'
+            cat comment.md
+            echo 'COMMENT_EOF'
+          } >> "${GITHUB_OUTPUT}"
+      - name: Upsert sticky PR comment
+        uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd # v8
+        with:
+          script: |
+            const fs = require('fs');
+            const body = fs.readFileSync('comment.md', 'utf8');
+            const marker = '<!-- pantheon-security-ci-summary -->';
+            const finalBody = `${marker}\n${body}`;
+            const { owner, repo } = context.repo;
+            const issue_number = context.payload.pull_request.number;
+            const comments = await github.paginate(github.rest.issues.listComments, {
+              owner, repo, issue_number, per_page: 100,
+            });
+            const existing = comments.find((c) => c.body && c.body.includes(marker));
+            if (existing) {
+              await github.rest.issues.updateComment({
+                owner, repo, comment_id: existing.id, body: finalBody,
+              });
+            } else {
+              await github.rest.issues.createComment({
+                owner, repo, issue_number, body: finalBody,
+              });
+            }

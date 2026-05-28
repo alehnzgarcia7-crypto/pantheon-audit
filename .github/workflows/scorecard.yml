@@ -1,0 +1,64 @@
+name: OpenSSF Scorecard
+
+# Scorecard with publish_results: false runs the security posture checks
+# locally on the runner and saves the SARIF report as an artifact. The
+# OpenSSF public results API requires a public repository, so on a private
+# repo we deliberately skip the publish step. Score visibility stays in
+# the artifact for the maintainer.
+
+on:
+  schedule:
+    - cron: '31 7 * * 1'
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions: read-all
+
+concurrency:
+  group: scorecard-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
+
+jobs:
+  analysis:
+    name: Scorecard analysis
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - name: Harden runner
+        uses: step-security/harden-runner@9af89fc71515a100421586dfdb3dc9c984fbf411 # v2.19.4
+        with:
+          egress-policy: audit
+      - name: Checkout
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          persist-credentials: false
+      - name: Run scorecard analysis
+        uses: ossf/scorecard-action@4eaacf0543bb3f2c246792bd56e8cdeffafb205a # v2.4.3
+        with:
+          results_file: scorecard.sarif
+          results_format: sarif
+          publish_results: false
+      - name: Upload SARIF artifact
+        if: always()
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
+        with:
+          name: scorecard-sarif
+          path: scorecard.sarif
+          retention-days: 30
+      - name: Step summary
+        if: always()
+        run: |
+          set -euo pipefail
+          {
+            echo "## OpenSSF Scorecard"
+            echo ""
+            echo "Run completed. SARIF report uploaded as artifact \`scorecard-sarif\`."
+            echo ""
+            echo "Publish to OpenSSF public results API is disabled (publish_results: false) because"
+            echo "the repository is private. To consume the score, download the SARIF artifact and"
+            echo "inspect locally, or grep for \`\"score\":\` in the SARIF metadata."
+          } >> "${GITHUB_STEP_SUMMARY}"

@@ -27,8 +27,20 @@ esac
 
 # CVE blocklist: unconditional deny regardless of trusted-root
 SERVER_VERSION="$(printf '%s' "$INPUT" | jq -r '.mcp_server_version // empty')"
-# Normalize to defeat whitespace/case bypass (PANTHEON-0008).
-SERVER_VERSION_NORM="$(printf '%s' "$SERVER_VERSION" | tr -d '[:space:]' | tr '[:upper:]' '[:lower:]')"
+# Normalize to defeat whitespace/case/Unicode bypass (PANTHEON-0008 + Sprint 3 hardening).
+# Python path covers Unicode zero-width (U+200B-U+200D, U+2060, U+FEFF), Zs spaces (NBSP and friends),
+# and NFKC fullwidth lookalikes. Fallback to ASCII-only if python3 is unavailable.
+if command -v python3 >/dev/null 2>&1; then
+  SERVER_VERSION_NORM="$(printf '%s' "$SERVER_VERSION" | python3 -c '
+import sys, unicodedata
+s = unicodedata.normalize("NFKC", sys.stdin.read())
+zero_width = {"​", "‌", "‍", "⁠", "﻿"}
+s = "".join(c for c in s if not unicodedata.category(c).startswith("Z") and c not in zero_width and not c.isspace())
+print(s.lower(), end="")
+')"
+else
+  SERVER_VERSION_NORM="$(printf '%s' "$SERVER_VERSION" | tr -d '[:space:]' | tr '[:upper:]' '[:lower:]')"
+fi
 if [ "$SERVER_VERSION_NORM" = "windsurf/1.9544.26" ]; then
   jq -n --arg reason "BLOCKED: CVE-2026-30615 Windsurf MCP prompt-injection-to-RCE" '{
     hookSpecificOutput: {
