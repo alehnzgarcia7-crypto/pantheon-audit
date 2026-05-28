@@ -141,3 +141,45 @@ export MAX_THINKING_TOKENS=31999
 ```
 
 Helps PANTHEON personas reason at depth.
+
+## Cloud-sync warning (PANTHEON-0014 mitigation)
+
+`.pantheon/` in your project workspace and `~/Downloads/pantheon-audit-<uuid>/` in your Downloads directory both contain exploitation guidance for the audit subject until remediation. These directories include:
+
+- Phase outputs that describe attack chains step by step
+- Finding bodies with file:line citations and reproduction commands
+- Proofs of concept and sample payloads
+- The full adversarial-gate log with the auditor's reasoning chain
+
+If these files are syncronized to iCloud, Google Drive, OneDrive, Dropbox, or any third-party storage backend, the audit subject's exploitable weaknesses leak to that backend. For multi-party audits (your code, a vendor's library, a customer's data), this is third-party harm.
+
+Recommended exclusions:
+
+```bash
+# macOS iCloud
+cd ~/Downloads
+xattr -w com.apple.metadata:com_apple_backup_excludeItem com.apple.backupd pantheon-audit-*
+xattr -w com.apple.metadata:com_apple_backup_excludeItem com.apple.backupd .pantheon
+
+# Dropbox or Google Drive
+# Use the application's selective-sync UI to deselect ~/Downloads/pantheon-audit-* and any
+# workspace .pantheon/ tree.
+
+# OneDrive
+# Settings -> Sync and backup -> Choose folders -> uncheck the audit directories.
+```
+
+The `init-pantheon-dir.sh` script appends `.pantheon/` to a local `.gitignore` automatically, so accidental `git add .` does not capture the audit state. The cloud-sync exclusion is your responsibility because the OS-level sync agents have no awareness of audit-state semantics.
+
+## Marketplace typosquatting (PANTHEON-0015 awareness)
+
+The PANTHEON plugin is published as `pantheon@pantheon-audit` from the marketplace `alehnzgarcia7-crypto/pantheon-audit`. Look-alike names to refuse on install:
+
+- `pantheon-pro`, `pantheon-audit-pro`, `pantheon-audit-plus`
+- `panthe0n-audit`, `pantheon-audít` (Unicode lookalike)
+- `pantheon-audit-mx`, `pantheon-audit-en` (regional variants by unknown maintainer)
+- Marketplaces other than `alehnzgarcia7-crypto/pantheon-audit` that claim to host PANTHEON
+
+Verify the marketplace owner against the maintainer's GitHub profile (https://github.com/alehnzgarcia7-crypto) before adding any marketplace claiming to publish PANTHEON. The canonical `marketplace.json` is signed via Sigstore Cosign v3; see Step 2 above for the verification flow.
+
+If you discover a typosquatted PANTHEON plugin in any marketplace, please report via SECURITY.md so the maintainer can coordinate takedown.

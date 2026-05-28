@@ -49,8 +49,60 @@ Must represent actual public methodologies from named consultancies, researchers
 3. Methodology pass (accuracy of persona/framework representation)
 4. Self-audit pass (run PANTHEON on changes)
 
+## Signed commits
+
+All commits to `main` must be cryptographically signed. The `main` branch is configured to require signed commits via GitHub branch protection.
+
+Choose one signing method and configure once on your development machine:
+
+### Option A: Sigstore (gitsign, OIDC-keyless)
+
+```bash
+brew install sigstore/tap/gitsign
+git config --global gpg.x509.program gitsign
+git config --global gpg.format x509
+git config --global commit.gpgsign true
+```
+
+First commit will prompt OIDC browser login. Subsequent commits sign silently for the session.
+
+### Option B: SSH signing (recommended for solo maintainer)
+
+```bash
+ssh-keygen -t ed25519 -C "alex@pantheon-audit signing key"
+git config --global gpg.format ssh
+git config --global user.signingkey ~/.ssh/id_ed25519.pub
+git config --global commit.gpgsign true
+```
+
+Upload the public key to GitHub at https://github.com/settings/keys, marking it as a signing key.
+
+### Option C: GPG (traditional)
+
+```bash
+gpg --full-generate-key  # ed25519 or rsa4096 recommended
+git config --global user.signingkey <KEY_ID>
+git config --global commit.gpgsign true
+```
+
+Upload the public block to GitHub at https://github.com/settings/keys.
+
+### Verification
+
+After configuring, every `git commit` should produce a commit with a `gpgsig` field. Verify locally:
+
+```bash
+git log --show-signature -1
+```
+
+GitHub renders the badge as `Verified` in the commits view when the signing key is registered.
+
+Unsigned commits are rejected by the branch protection ruleset on `main`. Open PRs from feature branches; the branch protection enforces the signature requirement at merge.
+
 ## License
+
 Contributions licensed under MIT.
 
 ## Maintainer
+
 Alex (@nexogeopo). Reviews typically within 7 days.

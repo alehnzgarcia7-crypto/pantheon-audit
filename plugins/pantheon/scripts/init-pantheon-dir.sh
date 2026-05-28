@@ -58,4 +58,15 @@ EOF
 
 cp "$PANTHEON_DIR/state.json" "$PANTHEON_DIR/state.json.backup"
 
+# PANTHEON-0014 mitigation: ensure local .gitignore excludes the audit directory.
+# The .pantheon/ tree stores exploitation guidance for the audit subject until
+# remediation. Accidentally committing or cloud-syncing it leaks third-party harm.
+if [ -d .git ] || [ -f .gitignore ]; then
+    if ! grep -qE '^\.pantheon/?$|^/\.pantheon/?$' .gitignore 2>/dev/null; then
+        printf '\n# PANTHEON audit state (contains exploitation guidance until remediation; do not commit or cloud-sync)\n.pantheon/\n' >> .gitignore
+        echo "[PANTHEON] Appended .pantheon/ to .gitignore (audit state must not be committed)" >&2
+    fi
+fi
+
 echo "[PANTHEON] Initialized .pantheon/ at $(pwd). Audit ID: $AUDIT_ID"
+echo "[PANTHEON] Reminder: .pantheon/ and ~/Downloads/pantheon-audit-${AUDIT_ID}/ contain exploitation guidance until remediation. Exclude both from cloud-sync (iCloud, Google Drive, OneDrive, Dropbox). See plugins/pantheon/references/ethics-disclaimer.md." >&2
