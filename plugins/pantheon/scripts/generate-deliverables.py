@@ -22,6 +22,16 @@ UUID_V4_RE = re.compile(
     r"^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
 )
 
+_MARKDOWN_ESCAPE_RE = re.compile(r"([\\`*_{}\[\]()#+\-.!|<>])")
+
+
+def markdown_escape(value):
+    """Escape markdown control characters so an untrusted scalar from
+    state.json cannot inject links, headings, or HTML when interpolated
+    into a generated deliverable. PANTHEON-0010 mitigation.
+    """
+    return _MARKDOWN_ESCAPE_RE.sub(r"\\\1", str(value))
+
 DELIVERABLES = [
     "01-executive-summary.md",
     "02-findings-detail.md",
@@ -92,10 +102,11 @@ def main():
                 encoding="utf-8",
             )
     readme = output_dir / "README.md"
+    project_name = state.get("scope", {}).get("project_name", "unknown")
     readme.write_text(
         "# PANTHEON Audit Deliverables\n\n"
-        f"**Audit ID**: {audit_id}\n"
-        f"**Project**: {state.get('scope', {}).get('project_name', 'unknown')}\n\n"
+        f"**Audit ID**: {markdown_escape(audit_id)}\n"
+        f"**Project**: {markdown_escape(project_name)}\n\n"
         "## Deliverables\n\n"
         + "\n".join(f"- {deliverable}" for deliverable in DELIVERABLES)
         + "\n",

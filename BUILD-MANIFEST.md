@@ -1,18 +1,19 @@
 # BUILD-MANIFEST
 
-PANTHEON v1.0.0 (v5.0 mega-prompt) deterministic-build manifest.
+PANTHEON v1.0.0 (v5.0 mega-prompt) manifest. Sprint 2 added 8 CI configuration files (PANTHEON-0005 remediation). Sprint 4 adds SECURITY.md (PANTHEON-0004 remediation).
 
-Total files: **156**.
+Total files: **165** (157 plugin + 8 CI configs).
 
 CC MUST create exactly these 156 files. No additions, no omissions, no silent renames. Content for each path resolves via Subsection 0.7 File Content Resolution Rule (explicit `### File:` section, else Section 5.6 Finding extraction, else category contract). Validation in Appendix A diffs `find . -type f | sort` against this list.
 
-## Repo-level (7)
+## Repo-level (8)
 - BUILD-MANIFEST.md
 - LICENSE
 - README.md
 - CLAUDE.md
 - CODE_OF_CONDUCT.md
 - CONTRIBUTING.md
+- SECURITY.md
 - .gitignore
 
 ## Marketplace + Plugin manifests (2)
@@ -188,8 +189,18 @@ CC MUST create exactly these 156 files. No additions, no omissions, no silent re
 ## Plugin README (1)
 - plugins/pantheon/README.md
 
+## CI configs (8, Sprint 2 supply-chain remediation per PANTHEON-0005)
+- .github/workflows/security.yml
+- .github/workflows/codeql.yml
+- .github/workflows/scorecard.yml
+- .semgrep/pantheon-custom-rules.yml
+- .gitleaks.toml
+- .pre-commit-config.yaml
+- bandit.yaml
+- markdownlint.json
+
 ## Reconciliation
-7 + 2 + 11 + 10 + 9 + 9 + 6 + 16 + 39 + 35 + 8 + 3 + 1 = 156
+8 + 2 + 11 + 10 + 9 + 9 + 6 + 16 + 39 + 35 + 8 + 3 + 1 + 8 = 165
 
 CC validates `find . -type f | sort | uniq | wc -l` equals 156 before declaring complete. Any deviation halts with MANIFEST_ERROR. Content for templates 01-22 and any reference lacking an explicit `### File:` section resolves via Subsection 0.7 (Section 5.6 Finding extraction or category contract). Note: skill reference file names reflect the real `### File:` sections in this document. Some v5.0 frontier references (for example CNSA matrix, Digital Omnibus timeline) extract their content from the corresponding Section 5.6 Finding per the resolution rule.
 

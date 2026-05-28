@@ -105,3 +105,81 @@
 
 ## Update mechanism
 This index updated annually or when framework version released. Auditor verifies article references against current official sources before citing in production deliverables.
+
+---
+
+## Auxiliary frameworks (PANTHEON-0019 expansion)
+
+These frameworks are not part of the canonical 18 catalog above but are routinely cited by PANTHEON personas in phase outputs and finding mappings. Maintained here for citation provenance and to satisfy the meta-audit consistency check.
+
+### A1. NIST SP 800-218 SSDF
+- Secure Software Development Framework
+- Citation: `PO.x.y`, `PS.x.y`, `PW.x.y`, `RV.x.y` (Practice category dot task)
+- v1.1 (latest 2026)
+- Applies always (every development practice maps to one or more SSDF tasks)
+
+### A2. SLSA
+- Supply-chain Levels for Software Artifacts
+- Citation: `SLSA L<n>` for level, `SLSA <track> L<n>` for track and level
+- v1.1 source track, build track, deployment track
+- Applies when: build pipeline, artifact distribution, or dependency provenance is in scope
+
+### A3. MITRE ATLAS
+- Adversarial Threat Landscape for AI Systems
+- Citation: `AML.T<NNNN>` for techniques, `AML.TA<NNNN>` for tactics
+- v2026 (latest)
+- Applies when: AI/ML, LLM applications, RAG, agentic systems, MCP-served tools in scope
+
+### A4. OWASP Top 10 for LLM Applications
+- Citation: `LLM<NN>:<YEAR>` (e.g., LLM01:2025)
+- 2025 edition
+- Applies when: LLM applications in scope
+
+### A5. NIST AI RMF
+- AI Risk Management Framework
+- Citation: framework function (`GOVERN`, `MAP`, `MEASURE`, `MANAGE`) and subcategory
+- v1.0 plus Generative AI Profile (NIST AI 600-1)
+- Applies when: AI systems in scope or AI risk governance evidence required
+
+### A6. ISO/IEC 42001
+- AI Management System Standard
+- Citation: clause number (e.g., `Clause 8.4`)
+- 2023 edition
+- Applies when: AI/ML in scope and organization seeks ISO certification path
+
+### A7. EU AI Act
+- Regulation (EU) 2024/1689
+- Citation: Article number (e.g., `Article 15`)
+- In force progressively from August 2024 (general purpose AI models from August 2025; full applicability August 2026)
+- Applies when: AI system placed on EU market, used by EU establishment, or affecting persons located in EU
+
+### A8. OWASP SAMM 2
+- Software Assurance Maturity Model
+- Citation: business function + security practice + maturity level (e.g., `Verification.Security Testing.L3`)
+- v2.0
+- Applies when: SDLC maturity assessment is in scope
+
+### A9. BSIMM
+- Building Security In Maturity Model
+- Citation: domain.practice.activity-id (e.g., `SR1.1`)
+- v14 (latest 2026)
+- Applies when: empirical SDLC benchmarking against industry peers is in scope
+
+### A10. OpenSSF Scorecard
+- Citation: check name (e.g., `Branch-Protection`, `Pinned-Dependencies`, `Token-Permissions`)
+- v5 checks suite
+- Applies always for open source repositories
+
+### A11. OpenSSF Best Practices Badge
+- Citation: `BasicBadge`, `SilverBadge`, `GoldBadge` and the criterion identifier
+- Applies when: badge claim is part of the project's public attestation
+
+### A12. TIBER-EU
+- Threat Intelligence-Based Ethical Red Teaming framework
+- Citation: TIBER stage (e.g., `Targeting`, `Reconnaissance`, `Weaponization`, ...)
+- v2024 (latest)
+- Applies when: financial entity in EU/UK regulated environment requires threat-led testing
+
+### Update mechanism (auxiliary)
+
+Auxiliary frameworks are reviewed semi-annually. The compliance-mapper persona is authorized to cite from this auxiliary section as long as the article-level citation includes the version cited (e.g., `MITRE ATLAS AML.T0051 (v2026)`). When citing in a deliverable, the auditor confirms the auxiliary framework is in the SoW's jurisdictional or industry scope; otherwise the citation is informational and labeled as such.
