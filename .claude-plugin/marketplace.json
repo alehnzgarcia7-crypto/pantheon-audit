@@ -9,7 +9,7 @@
   "plugins": [
     {
       "name": "pantheon",
-      "description": "A multi-persona adversarially gated security audit workflow. Convenes eight elite auditor personas in twelve phases with adversarial gate, compliance auto-mapping to eighteen frameworks, and thirty-five auto-generated deliverables.",
+      "description": "A multi-persona adversarially gated security audit workflow. Convenes eight elite auditor personas in twelve phases with adversarial gate, compliance auto-mapping to eighteen frameworks, and thirty-five auto-generated deliverables. Releases are signed with Sigstore Cosign v3; verify via cosign verify-blob (procedure in docs/installation.md Step 2) before installation.",
       "version": "1.0.0",
       "author": {
         "name": "Alex",

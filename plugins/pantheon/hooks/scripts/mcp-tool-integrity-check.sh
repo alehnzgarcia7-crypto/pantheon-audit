@@ -27,7 +27,9 @@ esac
 
 # CVE blocklist: unconditional deny regardless of trusted-root
 SERVER_VERSION="$(printf '%s' "$INPUT" | jq -r '.mcp_server_version // empty')"
-if [ "$SERVER_VERSION" = "windsurf/1.9544.26" ]; then
+# Normalize to defeat whitespace/case bypass (PANTHEON-0008).
+SERVER_VERSION_NORM="$(printf '%s' "$SERVER_VERSION" | tr -d '[:space:]' | tr '[:upper:]' '[:lower:]')"
+if [ "$SERVER_VERSION_NORM" = "windsurf/1.9544.26" ]; then
   jq -n --arg reason "BLOCKED: CVE-2026-30615 Windsurf MCP prompt-injection-to-RCE" '{
     hookSpecificOutput: {
       hookEventName: "PreToolUse",

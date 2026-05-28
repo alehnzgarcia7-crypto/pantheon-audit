@@ -24,12 +24,30 @@ Option B: download release tarball (if released)
 
 ### Step 2: Verify integrity
 
+Releases are signed with Sigstore Cosign v3 (see `plugins/pantheon/scripts/release-sign.sh`). Before installing a release tarball, verify the bundle:
+
 ```bash
 cd ~/repos/pantheon-audit
-ls -la .claude-plugin/marketplace.json plugins/pantheon/.claude-plugin/plugin.json
+cosign verify-blob \
+  --bundle pantheon-v1.0.0.zip.cosign.bundle \
+  --trusted-root https://tuf-repo-cdn.sigstore.dev/targets/trusted_root.json \
+  --certificate-identity-regexp '^https://github.com/alehnzgarcia7-crypto/pantheon-audit/' \
+  --certificate-oidc-issuer 'https://token.actions.githubusercontent.com' \
+  pantheon-v1.0.0.zip
 ```
 
-Both must exist and be valid JSON.
+Expected output: `Verified OK`. If verification fails, abort installation and report to the maintainer (@nexogeopo).
+
+Cosign v3.0.4 or newer is required (GHSA-whqx-f9j3-ch6m fix). On macOS: `brew install cosign`. On Linux: see https://docs.sigstore.dev/cosign/installation/.
+
+If installing from a local clone (Option A above, no release tarball), verify the manifests exist and parse:
+
+```bash
+ls -la .claude-plugin/marketplace.json plugins/pantheon/.claude-plugin/plugin.json
+jq empty .claude-plugin/marketplace.json plugins/pantheon/.claude-plugin/plugin.json && echo "OK"
+```
+
+Both must exist and `jq empty` must return zero (silent success).
 
 ### Step 3: Add marketplace
 
