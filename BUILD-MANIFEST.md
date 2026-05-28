@@ -33,16 +33,16 @@ CC MUST create exactly these 156 files. No additions, no omissions, no silent re
 - plugins/pantheon/agents/trail-of-bits-auditor.md
 
 ## Slash commands (10)
-- plugins/pantheon/commands/pantheon-cross.md
-- plugins/pantheon/commands/pantheon-deliverables.md
-- plugins/pantheon/commands/pantheon-final.md
-- plugins/pantheon/commands/pantheon-finding.md
-- plugins/pantheon/commands/pantheon-persona.md
-- plugins/pantheon/commands/pantheon-phase.md
-- plugins/pantheon/commands/pantheon-reset.md
-- plugins/pantheon/commands/pantheon-resume.md
-- plugins/pantheon/commands/pantheon-start.md
-- plugins/pantheon/commands/pantheon-status.md
+- plugins/pantheon/commands/cross.md
+- plugins/pantheon/commands/deliverables.md
+- plugins/pantheon/commands/final.md
+- plugins/pantheon/commands/finding.md
+- plugins/pantheon/commands/persona.md
+- plugins/pantheon/commands/phase.md
+- plugins/pantheon/commands/reset.md
+- plugins/pantheon/commands/resume.md
+- plugins/pantheon/commands/start.md
+- plugins/pantheon/commands/status.md
 
 ## Hooks (9: 1 json + 8 scripts)
 - plugins/pantheon/hooks/hooks.json
