@@ -14,8 +14,13 @@ Usage:
 
 import json
 import os
+import re
 import sys
 from pathlib import Path
+
+UUID_V4_RE = re.compile(
+    r"^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
+)
 
 DELIVERABLES = [
     "01-executive-summary.md",
@@ -63,7 +68,20 @@ def main():
         sys.exit(1)
     state = json.loads(state_path.read_text(encoding="utf-8"))
     audit_id = state.get("audit_id", "unknown")
-    output_dir = Path.home() / "Downloads" / f"pantheon-audit-{audit_id}"
+    if not UUID_V4_RE.match(audit_id):
+        print(
+            f"[PANTHEON] audit_id is not a UUID v4: {audit_id!r}",
+            file=sys.stderr,
+        )
+        sys.exit(2)
+    downloads_root = (Path.home() / "Downloads").resolve()
+    output_dir = (downloads_root / ("pantheon-audit-" + audit_id)).resolve()
+    if not output_dir.is_relative_to(downloads_root):
+        print(
+            f"[PANTHEON] output_dir escapes Downloads: {output_dir!r}",
+            file=sys.stderr,
+        )
+        sys.exit(3)
     output_dir.mkdir(parents=True, exist_ok=True)
     for deliverable in DELIVERABLES:
         skeleton = output_dir / deliverable
