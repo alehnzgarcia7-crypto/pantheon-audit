@@ -1,0 +1,17 @@
+{
+  "name": "pantheon",
+  "version": "1.0.0",
+  "description": "A multi-persona adversarially gated security audit workflow for Claude Code. Multi-persona orchestration, 12-phase workflow, adversarial gate, compliance auto-mapping to 18 frameworks, 35-deliverable auto-generation. All sub-agents Opus 4.7 max effort.",
+  "author": {
+    "name": "Alex",
+    "url": "https://github.com/alehnzgarcia7-crypto"
+  },
+  "homepage": "https://github.com/alehnzgarcia7-crypto/pantheon-audit",
+  "repository": "https://github.com/alehnzgarcia7-crypto/pantheon-audit",
+  "license": "MIT",
+  "keywords": [
+    "security", "audit", "threat-modeling", "pentest", "compliance",
+    "fintech", "red-team", "formal-verification", "adversarial-gate",
+    "owasp-asvs-l3", "pasta", "stride", "linddun", "mitre-attack"
+  ]
+}

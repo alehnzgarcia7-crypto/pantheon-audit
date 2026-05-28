@@ -1,0 +1,29 @@
+{
+  "name": "pantheon-audit",
+  "version": "1.0.0",
+  "description": "Multi-persona elite security audit plugin marketplace. Currently contains the PANTHEON plugin: 11 sub-agents, 12 phases, 35 deliverables (v4.0 BILLIONS-TIER).",
+  "owner": {
+    "name": "Alex",
+    "url": "https://github.com/alehnzgarcia7-crypto"
+  },
+  "plugins": [
+    {
+      "name": "pantheon",
+      "description": "A multi-persona adversarially gated security audit workflow. Convenes eight elite auditor personas in twelve phases with adversarial gate, compliance auto-mapping to eighteen frameworks, and thirty-five auto-generated deliverables.",
+      "version": "1.0.0",
+      "author": {
+        "name": "Alex",
+        "url": "https://github.com/alehnzgarcia7-crypto"
+      },
+      "homepage": "https://github.com/alehnzgarcia7-crypto/pantheon-audit",
+      "repository": "https://github.com/alehnzgarcia7-crypto/pantheon-audit",
+      "license": "MIT",
+      "keywords": [
+        "security", "audit", "threat-modeling", "pentest", "compliance",
+        "fintech", "red-team", "formal-verification", "owasp", "asvs",
+        "cnbv", "lfpdppp", "gdpr", "pci-dss", "soc2", "iso27001"
+      ],
+      "source": "./plugins/pantheon"
+    }
+  ]
+}

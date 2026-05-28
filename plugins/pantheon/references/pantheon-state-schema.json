@@ -1,0 +1,176 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "PANTHEON Audit State Schema",
+  "type": "object",
+  "required": ["schema_version", "audit_id", "started_at", "phases", "findings"],
+  "properties": {
+    "schema_version": {
+      "type": "string",
+      "const": "1.0.0"
+    },
+    "audit_id": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "started_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "updated_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "scope": {
+      "type": "object",
+      "properties": {
+        "project_name": {"type": "string"},
+        "scope_description": {"type": "string"},
+        "exclusions": {"type": "array", "items": {"type": "string"}},
+        "geographic_scope": {"type": "array", "items": {"type": "string"}},
+        "industry": {"type": "string"},
+        "compliance_frameworks_in_scope": {"type": "array", "items": {"type": "string"}}
+      }
+    },
+    "current_phase": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 12
+    },
+    "phases": {
+      "type": "object",
+      "patternProperties": {
+        "^[0-9]+$": {
+          "type": "object",
+          "required": ["status"],
+          "properties": {
+            "status": {
+              "type": "string",
+              "enum": ["pending", "in-progress", "complete", "skipped"]
+            },
+            "started_at": {"type": "string", "format": "date-time"},
+            "completed_at": {"type": "string", "format": "date-time"},
+            "deliverable_path": {"type": "string"},
+            "personas_dispatched": {"type": "array", "items": {"type": "string"}},
+            "skip_reason": {"type": "string"}
+          }
+        }
+      }
+    },
+    "findings": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "title", "severity", "status"],
+        "properties": {
+          "id": {"type": "string", "pattern": "^PANTHEON-[0-9]{4}$"},
+          "title": {"type": "string", "maxLength": 80},
+          "severity": {
+            "type": "string",
+            "enum": ["Critical", "High", "Medium", "Low", "Informational"]
+          },
+          "cvss_v4_vector": {"type": "string"},
+          "cvss_v4_score": {"type": "number", "minimum": 0, "maximum": 10},
+          "exploitation_difficulty": {
+            "type": "string",
+            "enum": ["Low", "Medium", "High"]
+          },
+          "business_impact_usd": {"type": "number"},
+          "business_impact_reasoning": {"type": "string"},
+          "threat_actors_capable": {
+            "type": "array",
+            "items": {"type": "string", "enum": ["T1", "T2", "T3", "T4", "T5", "T6", "T7", "T8"]}
+          },
+          "discovered_by": {"type": "string"},
+          "phase": {"type": "integer"},
+          "discovered_at": {"type": "string", "format": "date-time"},
+          "affected_component": {"type": "string"},
+          "affected_files": {"type": "array", "items": {"type": "string"}},
+          "first_introduced_commit": {"type": "string"},
+          "description": {"type": "string"},
+          "exploitation_scenario": {"type": "string"},
+          "recommendation_short_term": {"type": "string"},
+          "recommendation_long_term": {"type": "string"},
+          "compliance_mappings": {
+            "type": "object",
+            "properties": {
+              "cwe": {"type": ["string", "null"]},
+              "owasp_top10": {"type": ["string", "null"]},
+              "owasp_api_top10": {"type": ["string", "null"]},
+              "owasp_asvs_v5_l3": {"type": ["array", "null"], "items": {"type": "string"}},
+              "cnbv_cuf_cuifpes": {"type": ["array", "null"], "items": {"type": "string"}},
+              "lfpdppp_2025": {"type": ["array", "null"], "items": {"type": "string"}},
+              "sat_cff": {"type": ["array", "null"], "items": {"type": "string"}},
+              "gdpr": {"type": ["array", "null"], "items": {"type": "string"}},
+              "pci_dss_401": {"type": ["array", "null"], "items": {"type": "string"}},
+              "hipaa": {"type": ["array", "null"], "items": {"type": "string"}},
+              "soc2_tsc": {"type": ["array", "null"], "items": {"type": "string"}},
+              "iso27001_annex_a": {"type": ["array", "null"], "items": {"type": "string"}},
+              "iso27017": {"type": ["array", "null"], "items": {"type": "string"}},
+              "iso27018": {"type": ["array", "null"], "items": {"type": "string"}},
+              "iso27701": {"type": ["array", "null"], "items": {"type": "string"}},
+              "nist_800_53_rev5": {"type": ["array", "null"], "items": {"type": "string"}},
+              "mitre_attack": {"type": ["array", "null"], "items": {"type": "string"}},
+              "capec": {"type": ["array", "null"], "items": {"type": "string"}},
+              "mapping_confidence": {"type": "number", "minimum": 0, "maximum": 1},
+              "mapping_notes": {"type": "string"}
+            }
+          },
+          "adversarial_gate": {
+            "type": "object",
+            "properties": {
+              "verdict": {
+                "type": "string",
+                "enum": ["ACCEPT", "REVISE", "WITHDRAW", "DISPUTE"]
+              },
+              "confidence": {"type": "number", "minimum": 0, "maximum": 1},
+              "reviewed_at": {"type": "string", "format": "date-time"},
+              "cross_examination": {
+                "type": "object",
+                "properties": {
+                  "q1_working_poc": {"type": "string", "enum": ["PASS", "FAIL", "PARTIAL"]},
+                  "q2_severity_defensibility": {"type": "string", "enum": ["PASS", "FAIL", "PARTIAL"]},
+                  "q3_threat_actor_specificity": {"type": "string", "enum": ["PASS", "FAIL", "PARTIAL"]},
+                  "q4_cvss_vector_correctness": {"type": "string", "enum": ["PASS", "FAIL", "PARTIAL"]},
+                  "q5_path_to_production": {"type": "string", "enum": ["PASS", "FAIL", "PARTIAL"]},
+                  "q6_false_positive_check": {"type": "string", "enum": ["PASS", "FAIL", "PARTIAL"]},
+                  "q7_existing_mitigation": {"type": "string", "enum": ["PASS", "FAIL", "PARTIAL"]}
+                }
+              },
+              "verification_files_read": {"type": "array", "items": {"type": "string"}},
+              "notes": {"type": "string"}
+            }
+          },
+          "cross_verified_by": {"type": "array", "items": {"type": "string"}},
+          "references": {"type": "array", "items": {"type": "string"}},
+          "status": {
+            "type": "string",
+            "enum": ["draft", "adversarial-review", "accepted", "disputed", "withdrawn"]
+          }
+        }
+      }
+    },
+    "maturity_scorecard": {
+      "type": "object",
+      "patternProperties": {
+        "^dimension_[0-9]+$": {
+          "type": "object",
+          "properties": {
+            "name": {"type": "string"},
+            "rating": {
+              "type": "string",
+              "enum": ["Strong", "Satisfactory", "Moderate", "Weak", "Missing"]
+            },
+            "evidence": {"type": "string"},
+            "improvement_priority": {"type": "string", "enum": ["P0", "P1", "P2", "P3"]}
+          }
+        }
+      }
+    },
+    "deliverables_generated": {"type": "boolean", "default": false},
+    "deliverables_path": {"type": "string"},
+    "launch_decision": {
+      "type": "string",
+      "enum": ["GO", "CONDITIONAL_GO", "NO_GO", "PENDING"]
+    }
+  }
+}

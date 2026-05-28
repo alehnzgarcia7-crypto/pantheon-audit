@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<xbrl xmlns="http://www.xbrl.org/2003/instance"
+      xmlns:dora="http://www.eba.europa.eu/eu/dora/registerofinformation/v1">
+  <dora:RegisterOfInformation>
+    <dora:Entity>
+      <dora:LegalEntityIdentifier><!-- LEI --></dora:LegalEntityIdentifier>
+      <dora:EntityName><!-- name --></dora:EntityName>
+      <dora:CompetentAuthority><!-- ECB/national --></dora:CompetentAuthority>
+      <dora:ReportingPeriod><!-- YYYY-MM-DD --></dora:ReportingPeriod>
+    </dora:Entity>
+    <dora:ICTContracts>
+      <dora:Contract>
+        <dora:ContractID><!-- ID --></dora:ContractID>
+        <dora:Provider><!-- legal name --></dora:Provider>
+        <dora:ProviderLEI><!-- LEI --></dora:ProviderLEI>
+        <dora:ServiceType><!-- per EBA taxonomy --></dora:ServiceType>
+        <dora:Criticality><!-- critical / non-critical --></dora:Criticality>
+        <dora:SubcontractingChain>
+          <dora:Subcontractor tier="1">
+            <!-- Tier 1 sub -->
+          </dora:Subcontractor>
+          <dora:Subcontractor tier="2">
+            <!-- Tier 2 sub -->
+          </dora:Subcontractor>
+          <dora:Subcontractor tier="3">
+            <!-- Tier 3+ frequently incomplete in 2025 submissions -->
+          </dora:Subcontractor>
+        </dora:SubcontractingChain>
+        <dora:DataLocation><!-- ISO country code --></dora:DataLocation>
+        <dora:ContractStartDate><!-- date --></dora:ContractStartDate>
+        <dora:ContractEndDate><!-- date --></dora:ContractEndDate>
+        <!-- 116 mandatory fields total; full template per EBA -->
+      </dora:Contract>
+    </dora:ICTContracts>
+  </dora:RegisterOfInformation>
+</xbrl>
