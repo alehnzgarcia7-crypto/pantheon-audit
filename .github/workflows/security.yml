@@ -28,11 +28,11 @@ jobs:
       contents: read
     steps:
       - name: Harden runner
-        uses: step-security/harden-runner@0080882f6c36860b6ba35c610c98ce87d4e2f26f # v2.10.2
+        uses: step-security/harden-runner@9af89fc71515a100421586dfdb3dc9c984fbf411 # v2.19.4
         with:
           egress-policy: audit
       - name: Checkout
-        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
           fetch-depth: 0
           persist-credentials: false
@@ -58,14 +58,14 @@ jobs:
           echo "count=${n}" >> "${GITHUB_OUTPUT}"
       - name: Upload SARIF
         if: always()
-        uses: actions/upload-artifact@b4b15b8c7c6ac21ea08fcf65892d2ee8f75cf882 # v4.4.3
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
         with:
           name: gitleaks-sarif
           path: gitleaks.sarif
           retention-days: ${{ env.ARTIFACT_RETENTION_DAYS }}
       - name: Upload JSON
         if: always()
-        uses: actions/upload-artifact@b4b15b8c7c6ac21ea08fcf65892d2ee8f75cf882 # v4.4.3
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
         with:
           name: gitleaks-json
           path: gitleaks.json
@@ -98,7 +98,7 @@ jobs:
           } > gitleaks-summary.md
       - name: Upload PR summary fragment
         if: always()
-        uses: actions/upload-artifact@b4b15b8c7c6ac21ea08fcf65892d2ee8f75cf882 # v4.4.3
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
         with:
           name: pr-summary-gitleaks
           path: gitleaks-summary.md
@@ -119,64 +119,68 @@ jobs:
       contents: read
     steps:
       - name: Harden runner
-        uses: step-security/harden-runner@0080882f6c36860b6ba35c610c98ce87d4e2f26f # v2.10.2
+        uses: step-security/harden-runner@9af89fc71515a100421586dfdb3dc9c984fbf411 # v2.19.4
         with:
           egress-policy: audit
       - name: Checkout
-        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
           persist-credentials: false
       - name: Set up Python
-        uses: actions/setup-python@0b93645e9fea7318ecaed2b359559ac225c90a2b # v5.3.0
+        uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405 # v6.2.0
         with:
           python-version: '3.12'
       - name: Cache pip
-        uses: actions/cache@1bd1e32a3bdc45362d1e726936510720a7c30a57 # v4.2.0
+        uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5.0.5
         with:
           path: ~/.cache/pip
           key: pip-semgrep-${{ runner.os }}-1.95.0
       - name: Cache semgrep rule cache
-        uses: actions/cache@1bd1e32a3bdc45362d1e726936510720a7c30a57 # v4.2.0
+        uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5.0.5
         with:
           path: ~/.semgrep
           key: semgrep-rules-${{ runner.os }}-${{ hashFiles('.semgrep/**') }}
           restore-keys: |
             semgrep-rules-${{ runner.os }}-
       - name: Install semgrep
-        run: python -m pip install --upgrade pip semgrep==1.95.0
+        run: python -m pip install --upgrade pip semgrep==1.152.0
       - name: Run semgrep
         id: scan
         run: |
           set +e
-          semgrep ci \
+          semgrep scan \
             --config=.semgrep/pantheon-custom-rules.yml \
             --config=p/ci \
             --config=p/security-audit \
             --config=p/secrets \
-            --sarif --sarif-output=semgrep.sarif \
-            --json --json-output=semgrep.json \
-            --no-suppress-errors \
-            --metrics=off
+            --sarif-output=semgrep.sarif \
+            --json-output=semgrep.json \
+            --metrics=off \
+            --disable-version-check \
+            --no-suppress-errors
           rc=$?
           err=$(jq '[.results[]? | select(.extra.severity=="ERROR")] | length' semgrep.json 2>/dev/null || echo 0)
           warn=$(jq '[.results[]? | select(.extra.severity=="WARNING")] | length' semgrep.json 2>/dev/null || echo 0)
           info=$(jq '[.results[]? | select(.extra.severity=="INFO")] | length' semgrep.json 2>/dev/null || echo 0)
+          err=$(printf '%s' "${err}" | head -n1)
+          warn=$(printf '%s' "${warn}" | head -n1)
+          info=$(printf '%s' "${info}" | head -n1)
           {
-            echo "errors=${err}"
-            echo "warnings=${warn}"
-            echo "infos=${info}"
+            echo "errors=${err:-0}"
+            echo "warnings=${warn:-0}"
+            echo "infos=${info:-0}"
             echo "semgrep_rc=${rc}"
           } >> "${GITHUB_OUTPUT}"
       - name: Upload SARIF
         if: always()
-        uses: actions/upload-artifact@b4b15b8c7c6ac21ea08fcf65892d2ee8f75cf882 # v4.4.3
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
         with:
           name: semgrep-sarif
           path: semgrep.sarif
           retention-days: ${{ env.ARTIFACT_RETENTION_DAYS }}
       - name: Upload JSON
         if: always()
-        uses: actions/upload-artifact@b4b15b8c7c6ac21ea08fcf65892d2ee8f75cf882 # v4.4.3
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
         with:
           name: semgrep-json
           path: semgrep.json
@@ -217,7 +221,7 @@ jobs:
           } > semgrep-summary.md
       - name: Upload PR summary fragment
         if: always()
-        uses: actions/upload-artifact@b4b15b8c7c6ac21ea08fcf65892d2ee8f75cf882 # v4.4.3
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
         with:
           name: pr-summary-semgrep
           path: semgrep-summary.md
@@ -238,24 +242,24 @@ jobs:
       contents: read
     steps:
       - name: Harden runner
-        uses: step-security/harden-runner@0080882f6c36860b6ba35c610c98ce87d4e2f26f # v2.10.2
+        uses: step-security/harden-runner@9af89fc71515a100421586dfdb3dc9c984fbf411 # v2.19.4
         with:
           egress-policy: audit
       - name: Checkout
-        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
           persist-credentials: false
       - name: Set up Python
-        uses: actions/setup-python@0b93645e9fea7318ecaed2b359559ac225c90a2b # v5.3.0
+        uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405 # v6.2.0
         with:
           python-version: '3.12'
       - name: Cache pip
-        uses: actions/cache@1bd1e32a3bdc45362d1e726936510720a7c30a57 # v4.2.0
+        uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5.0.5
         with:
           path: ~/.cache/pip
           key: pip-bandit-${{ runner.os }}-1.8.0
-      - name: Install bandit
-        run: python -m pip install --upgrade pip bandit==1.8.0
+      - name: Install bandit with SARIF extra
+        run: python -m pip install --upgrade pip 'bandit[sarif,toml]==1.8.0'
       - name: Run bandit (-ll -r with bandit.yaml)
         id: scan
         run: |
@@ -265,25 +269,28 @@ jobs:
             -f json -o bandit.json
           bandit -ll -r plugins/pantheon/scripts/ \
             -c bandit.yaml \
-            -f sarif -o bandit.sarif || true
+            -f sarif -o bandit.sarif
           high=$(jq '[.results[]? | select(.issue_severity=="HIGH")] | length' bandit.json 2>/dev/null || echo 0)
           med=$(jq '[.results[]? | select(.issue_severity=="MEDIUM")] | length' bandit.json 2>/dev/null || echo 0)
           low=$(jq '[.results[]? | select(.issue_severity=="LOW")] | length' bandit.json 2>/dev/null || echo 0)
+          high=$(printf '%s' "${high}" | head -n1)
+          med=$(printf '%s' "${med}" | head -n1)
+          low=$(printf '%s' "${low}" | head -n1)
           {
-            echo "high=${high}"
-            echo "med=${med}"
-            echo "low=${low}"
+            echo "high=${high:-0}"
+            echo "med=${med:-0}"
+            echo "low=${low:-0}"
           } >> "${GITHUB_OUTPUT}"
       - name: Upload SARIF
         if: always()
-        uses: actions/upload-artifact@b4b15b8c7c6ac21ea08fcf65892d2ee8f75cf882 # v4.4.3
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
         with:
           name: bandit-sarif
           path: bandit.sarif
           retention-days: ${{ env.ARTIFACT_RETENTION_DAYS }}
       - name: Upload JSON
         if: always()
-        uses: actions/upload-artifact@b4b15b8c7c6ac21ea08fcf65892d2ee8f75cf882 # v4.4.3
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
         with:
           name: bandit-json
           path: bandit.json
@@ -324,7 +331,7 @@ jobs:
           } > bandit-summary.md
       - name: Upload PR summary fragment
         if: always()
-        uses: actions/upload-artifact@b4b15b8c7c6ac21ea08fcf65892d2ee8f75cf882 # v4.4.3
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
         with:
           name: pr-summary-bandit
           path: bandit-summary.md
@@ -346,11 +353,11 @@ jobs:
       contents: read
     steps:
       - name: Harden runner
-        uses: step-security/harden-runner@0080882f6c36860b6ba35c610c98ce87d4e2f26f # v2.10.2
+        uses: step-security/harden-runner@9af89fc71515a100421586dfdb3dc9c984fbf411 # v2.19.4
         with:
           egress-policy: audit
       - name: Checkout
-        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
           persist-credentials: false
       - name: Install shellcheck
@@ -384,14 +391,14 @@ jobs:
           } >> "${GITHUB_OUTPUT}"
       - name: Upload JSON
         if: always()
-        uses: actions/upload-artifact@b4b15b8c7c6ac21ea08fcf65892d2ee8f75cf882 # v4.4.3
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
         with:
           name: shellcheck-json
           path: shellcheck.json
           retention-days: ${{ env.ARTIFACT_RETENTION_DAYS }}
       - name: Upload text report
         if: always()
-        uses: actions/upload-artifact@b4b15b8c7c6ac21ea08fcf65892d2ee8f75cf882 # v4.4.3
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
         with:
           name: shellcheck-text
           path: shellcheck.txt
@@ -432,7 +439,7 @@ jobs:
           } > shellcheck-summary.md
       - name: Upload PR summary fragment
         if: always()
-        uses: actions/upload-artifact@b4b15b8c7c6ac21ea08fcf65892d2ee8f75cf882 # v4.4.3
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
         with:
           name: pr-summary-shellcheck
           path: shellcheck-summary.md
@@ -454,11 +461,11 @@ jobs:
       contents: read
     steps:
       - name: Harden runner
-        uses: step-security/harden-runner@0080882f6c36860b6ba35c610c98ce87d4e2f26f # v2.10.2
+        uses: step-security/harden-runner@9af89fc71515a100421586dfdb3dc9c984fbf411 # v2.19.4
         with:
           egress-policy: audit
       - name: Checkout
-        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
           persist-credentials: false
       - name: Install markdownlint-cli2
@@ -473,14 +480,20 @@ jobs:
           set +e
           markdownlint-cli2 --config markdownlint.json '**/*.md' '#node_modules' '#.pantheon' '#.git' > markdownlint.txt 2>&1
           rc=$?
-          n=$(grep -cE '^[^[:space:]].*:[0-9]+(:[0-9]+)?' markdownlint.txt 2>/dev/null || echo 0)
+          n=0
+          if [ -f markdownlint.txt ]; then
+            n=$(grep -cE '^[^[:space:]].*:[0-9]+(:[0-9]+)?' markdownlint.txt 2>/dev/null)
+            true  # absorb non-zero exit from grep when count is 0
+          fi
+          n=$(printf '%s' "${n:-0}" | head -n1)
+          n="${n:-0}"
           {
             echo "count=${n}"
             echo "rc=${rc}"
           } >> "${GITHUB_OUTPUT}"
       - name: Upload report
         if: always()
-        uses: actions/upload-artifact@b4b15b8c7c6ac21ea08fcf65892d2ee8f75cf882 # v4.4.3
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
         with:
           name: markdownlint-report
           path: markdownlint.txt
@@ -513,7 +526,7 @@ jobs:
           } > markdownlint-summary.md
       - name: Upload PR summary fragment
         if: always()
-        uses: actions/upload-artifact@b4b15b8c7c6ac21ea08fcf65892d2ee8f75cf882 # v4.4.3
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
         with:
           name: pr-summary-markdownlint
           path: markdownlint-summary.md
@@ -534,11 +547,11 @@ jobs:
       contents: read
     steps:
       - name: Harden runner
-        uses: step-security/harden-runner@0080882f6c36860b6ba35c610c98ce87d4e2f26f # v2.10.2
+        uses: step-security/harden-runner@9af89fc71515a100421586dfdb3dc9c984fbf411 # v2.19.4
         with:
           egress-policy: audit
       - name: Checkout
-        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
           persist-credentials: false
       - name: No em-dash (U+2014)
@@ -585,7 +598,7 @@ jobs:
           fi
       - name: Upload reports
         if: always()
-        uses: actions/upload-artifact@b4b15b8c7c6ac21ea08fcf65892d2ee8f75cf882 # v4.4.3
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
         with:
           name: pantheon-style-reports
           path: |
@@ -618,7 +631,7 @@ jobs:
           } > pantheon-style-summary.md
       - name: Upload PR summary fragment
         if: always()
-        uses: actions/upload-artifact@b4b15b8c7c6ac21ea08fcf65892d2ee8f75cf882 # v4.4.3
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
         with:
           name: pr-summary-pantheon-style
           path: pantheon-style-summary.md
@@ -635,11 +648,11 @@ jobs:
       pull-requests: write
     steps:
       - name: Harden runner
-        uses: step-security/harden-runner@0080882f6c36860b6ba35c610c98ce87d4e2f26f # v2.10.2
+        uses: step-security/harden-runner@9af89fc71515a100421586dfdb3dc9c984fbf411 # v2.19.4
         with:
           egress-policy: audit
       - name: Download summary fragments
-        uses: actions/download-artifact@fa0a91b85d4f404e444e00e005971372dc801d16 # v4.1.8
+        uses: actions/download-artifact@018cc2cf5baa6db3ef3c5f8a56943fffe632ef53 # v6.0.0
         with:
           pattern: pr-summary-*
           path: fragments
@@ -671,7 +684,7 @@ jobs:
             echo 'COMMENT_EOF'
           } >> "${GITHUB_OUTPUT}"
       - name: Upsert sticky PR comment
-        uses: actions/github-script@60a0d83039c74a4aee543508d2ffcb1c3799cdea # v7.0.1
+        uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd # v8
         with:
           script: |
             const fs = require('fs');

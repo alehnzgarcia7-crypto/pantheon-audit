@@ -3,33 +3,27 @@ rules:
     languages: [python]
     severity: ERROR
     message: |
-      Path construction concatenates a field read from state.json (or any untrusted
-      source) into a filesystem path without validation. This allows path traversal
-      when the field contains '../' or absolute paths. Fix: apply UUID_V4_RE regex
-      match on the field, OR use pathlib.Path.resolve() with is_relative_to() check
-      against an announced root (Path.home() / "Downloads").
+      Path construction interpolates a value sourced from state.json (or
+      similarly untrusted JSON input) into a filesystem path without
+      validation. When the source field contains '../' or an absolute
+      path, a path traversal write becomes possible. Fix: validate the
+      source field against a UUID v4 regex (or similar canonical form),
+      and apply pathlib.Path.resolve() with is_relative_to() against an
+      announced root (e.g. Path.home() / "Downloads") before any write.
     patterns:
       - pattern-either:
           - pattern: |
-              $STATE = json.loads(...)
-              ...
-              $X = $STATE.get($KEY, ...)
-              ...
-              $DIR = Path(...) / f"...{$X}..."
-          - pattern: |
-              $X = $STATE.get($KEY, ...)
+              $X = $STATE.get(...)
               ...
               $DIR = Path.home() / ... / f"...{$X}..."
           - pattern: |
-              $DIR = Path(...) / f"pantheon-audit-{$X}"
-      - metavariable-pattern:
-          metavariable: $KEY
-          patterns:
-            - pattern-either:
-                - pattern: '"audit_id"'
-                - pattern: '"project_name"'
-                - pattern: '"output_dir"'
-                - pattern: '"deliverables_path"'
+              $X = $STATE.get(...)
+              ...
+              $DIR = Path(...) / ... / f"...{$X}..."
+          - pattern: $DIR = Path.home() / ... / f"...{$STATE.get(...)}..."
+          - pattern: $DIR = Path(...) / ... / f"...{$STATE.get(...)}..."
+          - pattern: $DIR = Path(f"...{$STATE.get(...)}...")
+          - pattern: $DIR = Path.home() / f"...{$STATE.get(...)}..."
     metadata:
       cwe: "CWE-22"
       owasp: "A01:2021"
