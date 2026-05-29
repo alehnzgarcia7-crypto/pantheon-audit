@@ -1,5 +1,9 @@
 # PANTHEON-AUDIT REPO MEMORY
 
+## ⚡ First read on resumption
+
+**Read `PANTHEON-STATUS.md` first** for the current project state: version, latest audit verdict, open findings backlog, signing configuration (with recovery if commits get blocked), report bundle locations, and next-step options. This file (CLAUDE.md) covers style rules only.
+
 ## Repo purpose
 This repo is `pantheon-audit`, a Claude Code plugin implementing a high-assurance security audit workflow with eight auditor personas, twelve phases, adversarial gate verification, compliance auto-mapping to eighteen frameworks, and thirty-five auto-generated deliverables.
 
