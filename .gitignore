@@ -1,4 +1,5 @@
 .pantheon/
+.pantheon-baseline-*/
 .claude-mem/
 .claude-session/
 .DS_Store
